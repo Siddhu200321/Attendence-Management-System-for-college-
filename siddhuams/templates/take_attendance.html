@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Attendance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        .container {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 40px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            padding: 12px;
+            margin: 10px 0;
+            width: 80%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+        button {
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 200px;
+            margin: 20px 0;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .back-btn {
+            background-color: transparent;
+            color: #fff;
+            font-size: 16px;
+            text-decoration: underline;
+            border: none;
+            cursor: pointer;
+        }
+        .back-btn:hover {
+            color: #3498db;
+        }
+        /* Popup Styles */
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+            width: 90%;
+            max-width: 400px;
+            z-index: 1000;
+        }
+        .popup button {
+            background-color: #e74c3c;
+            width: auto;
+            padding: 10px 20px;
+            margin-top: 15px;
+        }
+        /* Camera Preview */
+        #camera {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Mark Attendance</h1>
+        <form id="attendanceForm">
+            <input type="text" name="roll_no" id="roll_no" placeholder="Enter Roll Number" required>
+            <input type="text" name="branch" id="branch" placeholder="Enter Branch Name" required>
+            <button type="button" onclick="startCamera()">Capture & Recognize</button>
+        </form>
+        <video id="camera" autoplay></video>
+        <button class="back-btn" onclick="window.location.href='/'">Back to Home</button>
+    </div>
+
+    <!-- Popup Message -->
+    <div id="popup" class="popup">
+        <p id="popup-message"></p>
+        <button onclick="closePopup()">OK</button>
+    </div>
+
+    <script>
+        let video = document.getElementById("camera");
+
+        function startCamera() {
+            let rollNo = document.getElementById("roll_no").value.trim();
+            let branch = document.getElementById("branch").value.trim();
+
+            if (rollNo === "" || branch === "") {
+                showPopup("Please fill in both Roll Number and Branch.");
+                return;
+            }
+
+            // Open Camera
+            video.style.display = "block";
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                    video.srcObject = stream;
+                    setTimeout(captureFace, 3000);  // Capture after 3 seconds
+                })
+                .catch((error) => {
+                    console.error("Camera access error:", error);
+                    showPopup("Camera access denied. Please enable camera.");
+                });
+        }
+
+        function captureFace() {
+            let canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            let context = canvas.getContext("2d");
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            let imageData = canvas.toDataURL("image/png");
+
+            // Stop Camera
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.style.display = "none";
+
+            // Send Face Data for Recognition
+            let formData = new FormData();
+            formData.append("roll_no", document.getElementById("roll_no").value);
+            formData.append("branch", document.getElementById("branch").value);
+            formData.append("face_image", imageData);
+
+            fetch('/take_attendance', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showPopup(data.message);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showPopup("An error occurred while taking attendance.");
+            });
+        }
+
+        function showPopup(message) {
+            document.getElementById("popup-message").innerText = message;
+            document.getElementById("popup").style.display = "block";
+        }
+
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+        }
+    </script>
+
+</body>
+</html>
